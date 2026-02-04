@@ -1,0 +1,15 @@
+services:
+  selenium:
+    image: seleniarm/standalone-chromium:latest
+    container_name: selenium
+    ports:
+      - "4444:4444"
+    shm_size: 2gb
+
+  app:
+    build: .
+    container_name: demo-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - selenium

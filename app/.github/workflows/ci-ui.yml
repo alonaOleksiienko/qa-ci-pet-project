@@ -1,0 +1,48 @@
+name: UI Tests (Selenium + Docker Compose)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  ui-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start services
+        run: |
+          set -eux
+          docker compose -f docker-compose.ci.yml up -d --build selenium app
+
+      - name: Wait for Selenium + App
+        run: |
+          set -eux
+          echo "Selenium status:"
+          curl -sSf http://localhost:4444/status | head -c 400 || true
+          echo
+          echo "App homepage:"
+          curl -sSf http://localhost:8080/ | head -c 200 || true
+          echo
+
+      - name: Run UI tests
+        run: |
+          set -eux
+          docker compose -f docker-compose.ci.yml run --rm tests mvn -q test
+
+      - name: Print logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.ci.yml logs --no-color --tail=200
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose.ci.yml down -v
+

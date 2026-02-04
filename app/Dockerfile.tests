@@ -1,0 +1,12 @@
+FROM maven:3.9-eclipse-temurin-17
+
+WORKDIR /work
+
+# Copy the whole project into the image
+COPY . .
+
+# Make mvnw executable (just in case)
+RUN chmod +x mvnw
+
+# Default command runs your UI tests profile
+CMD ["bash", "-lc", "./mvnw -Pui -Dtest=HomePageTest test"]
