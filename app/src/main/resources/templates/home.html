@@ -1,8 +1,19 @@
 <!DOCTYPE html>
-<html>
-<head><title>QA CI Pet Project</title></head>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>QA CI Pet Project</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+        a { display: inline-block; margin: 10px; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }
+        a:hover { background: #0056b3; }
+    </style>
+</head>
 <body>
-  <h1 id="title">QA CI Pet Project</h1>
-  <p id="build-text">Build: v1</p>
+    <h1 id="welcome-message" th:text="${message}">Welcome</h1>
+    <p>A CI/CD Automation Testing Framework</p>
+    <div>
+        <a href="/login" id="login-link">Login</a>
+        <a href="/health" id="health-link">Health Check</a>
+    </div>
 </body>
 </html>
