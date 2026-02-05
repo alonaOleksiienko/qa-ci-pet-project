@@ -21,6 +21,7 @@ jobs:
           set -eux
           docker compose -f app/docker-compose.ci.yml up -d --build
 
+      # ✅ RELIABLE Selenium wait via Docker health
       - name: Wait for Selenium (health)
         run: |
           set -eux
@@ -41,40 +42,54 @@ jobs:
           docker compose -f app/docker-compose.ci.yml logs selenium --tail=200 || true
           exit 1
 
+      # ✅ Wait for APP to respond first, then verify /login exists + has username field
       - name: Wait for App and verify /login has username field
         run: |
           set -eux
           APP_ID="$(docker compose -f app/docker-compose.ci.yml ps -q app)"
           echo "App container id: $APP_ID"
 
+          echo "Waiting for app to respond on / ..."
           for i in $(seq 1 60); do
-            echo "Checking /login inside app container... ($i)"
+            if docker exec "$APP_ID" sh -lc 'wget -qO- http://localhost:8080/ >/dev/null 2>&1'; then
+              echo "App responds on / ✅"
+              break
+            fi
+            echo "Waiting for app... ($i)"
+            sleep 2
+          done
 
-            # Get headers + body (so we can see redirects/404/500/etc)
-            HTML="$(docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1' || true)"
+          echo "Waiting for /login to return 200 and contain username field..."
+          for i in $(seq 1 60); do
+            # Get only HTTP status line
+            STATUS="$(docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1 | head -n 1' || true)"
 
-            # Accept both single and double quotes
-            echo "$HTML" | grep -Eq "data-testid=['\"]username['\"]" && {
-              echo "Login page contains username field ✅"
-              exit 0
-            }
+            # If it's 200, check HTML contains the field
+            if echo "$STATUS" | grep -q "200 OK"; then
+              if docker exec "$APP_ID" sh -lc "wget -qO- http://localhost:8080/login | grep -Eq \"data-testid=['\\\"']username['\\\"']\""; then
+                echo "/login is ready ✅"
+                exit 0
+              fi
+              echo "/login is 200 but username field not found yet... ($i)"
+            else
+              echo "Login not ready yet: $STATUS ($i)"
+            fi
 
-            # Every 10 tries show a short preview
+            # Every 10 tries show a short debug preview
             if [ $((i % 10)) -eq 0 ]; then
-              echo "---- DEBUG preview (headers + first 120 lines) ----"
-              echo "$HTML" | head -n 120 || true
-              echo "-----------------------------------------------"
+              echo "---- DEBUG /login (status + first 60 lines) ----"
+              docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1 | head -n 60' || true
+              echo "----------------------------------------------"
             fi
 
             sleep 2
           done
 
-          echo "Login page did not become ready ❌"
+          echo "❌ /login did not become ready in time"
+          echo "---- FINAL /login (status + first 120 lines) ----"
+          docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1 | head -n 120' || true
 
-          echo "---- FINAL /login output (headers + first 200 lines) ----"
-          docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1 | head -n 200' || true
-
-          echo "---- APP LOGS (last 200 lines) ----"
+          echo "---- APP LOGS (last 200) ----"
           docker compose -f app/docker-compose.ci.yml logs app --tail=200 || true
 
           exit 1
