@@ -1,0 +1,26 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"/>
+  <title>Login</title>
+</head>
+<body>
+  <h1>Login</h1>
+
+  <p th:if="${error}" style="color:red" data-testid="login-error">
+    Invalid username or password
+  </p>
+
+  <form method="post" action="/login">
+    <label>Username</label>
+    <input name="username" data-testid="username"/>
+    <br/>
+
+    <label>Password</label>
+    <input name="password" type="password" data-testid="password"/>
+    <br/>
+
+    <button type="submit" data-testid="login-btn">Sign in</button>
+  </form>
+</body>
+</html>
