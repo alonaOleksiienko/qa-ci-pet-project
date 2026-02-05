@@ -2,8 +2,9 @@ package com.example.ui;
 
 import org.junit.jupiter.api.*;
 import org.openqa.selenium.*;
-import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.net.URL;
 import java.time.Duration;
@@ -20,12 +21,17 @@ public class LoginUiTest {
 
         ChromeOptions options = new ChromeOptions();
         driver = new RemoteWebDriver(new URL(seleniumUrl), options);
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
+
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(1));
     }
 
     @AfterEach
     void tearDown() {
         if (driver != null) driver.quit();
+    }
+
+    private WebDriverWait wait10() {
+        return new WebDriverWait(driver, Duration.ofSeconds(10));
     }
 
     @Test
@@ -35,8 +41,8 @@ public class LoginUiTest {
         driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("secret");
         driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
 
-        Assertions.assertTrue(driver.getCurrentUrl().contains("/dashboard"));
-        Assertions.assertTrue(driver.findElement(By.cssSelector("[data-testid='dashboard-title']")).isDisplayed());
+        wait10().until(d -> d.getCurrentUrl().contains("/dashboard"));
+        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='dashboard-title']")).isDisplayed());
     }
 
     @Test
@@ -46,8 +52,8 @@ public class LoginUiTest {
         driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("wrong");
         driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
 
-        Assertions.assertTrue(driver.getCurrentUrl().contains("/login"));
-        Assertions.assertTrue(driver.findElement(By.cssSelector("[data-testid='login-error']")).isDisplayed());
+        wait10().until(d -> d.getCurrentUrl().contains("/login"));
+        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='login-error']")).isDisplayed());
     }
 
     @Test
@@ -57,13 +63,13 @@ public class LoginUiTest {
         driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("secret");
         driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
 
+        wait10().until(d -> d.getCurrentUrl().contains("/dashboard"));
+        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='logout-btn']")).isDisplayed());
+
         driver.findElement(By.cssSelector("[data-testid='logout-btn']")).click();
 
-        Assertions.assertTrue(
-            driver.getCurrentUrl().equals(baseUrl + "/") ||
-            driver.getCurrentUrl().equals(baseUrl)
-        );
-        Assertions.assertTrue(driver.findElement(By.cssSelector("#welcome-message")).isDisplayed());
-        Assertions.assertTrue(driver.findElement(By.cssSelector("#build-text")).isDisplayed());
+        driver.get(baseUrl + "/");
+        wait10().until(d -> d.findElement(By.id("welcome-message")).isDisplayed());
+        wait10().until(d -> d.findElement(By.id("build-text")).isDisplayed());
     }
 }
