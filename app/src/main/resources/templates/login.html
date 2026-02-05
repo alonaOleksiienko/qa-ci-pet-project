@@ -1,26 +1,26 @@
-<!doctype html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="utf-8"/>
-  <title>Login</title>
+    <title>Login - QA CI Pet Project</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; }
+        .error { color: red; margin-bottom: 15px; }
+        input { display: block; width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        h1 { text-align: center; }
+    </style>
 </head>
 <body>
-  <h1>Login</h1>
-
-  <p th:if="${error}" style="color:red" data-testid="login-error">
-    Invalid username or password
-  </p>
-
-  <form method="post" action="/login">
-    <label>Username</label>
-    <input name="username" data-testid="username"/>
-    <br/>
-
-    <label>Password</label>
-    <input name="password" type="password" data-testid="password"/>
-    <br/>
-
-    <button type="submit" data-testid="login-btn">Sign in</button>
-  </form>
+    <h1>Login</h1>
+    <div th:if="${error}" class="error" id="error-message">Invalid username or password</div>
+    <form method="post" action="/login">
+        <input type="text" id="username" name="username" data-testid="username" placeholder="Username" required />
+        <input type="password" id="password" name="password" data-testid="password" placeholder="Password" required />
+        <button type="submit" id="login-button" data-testid="login-btn">Login</button>
+    </form>
+    <p style="text-align: center; margin-top: 20px;">
+        <a href="/">Back to Home</a>
+    </p>
 </body>
 </html>
