@@ -21,7 +21,6 @@ jobs:
           set -eux
           docker compose -f app/docker-compose.ci.yml up -d --build
 
-      # ✅ RELIABLE Selenium wait (Docker health, not localhost)
       - name: Wait for Selenium (health)
         run: |
           set -eux
@@ -42,7 +41,6 @@ jobs:
           docker compose -f app/docker-compose.ci.yml logs selenium --tail=200 || true
           exit 1
 
-      # ✅ App check INSIDE container (not localhost)
       - name: Wait for App and verify /login has username field
         run: |
           set -eux
@@ -50,16 +48,35 @@ jobs:
           echo "App container id: $APP_ID"
 
           for i in $(seq 1 60); do
-            if docker exec "$APP_ID" wget -qO- http://localhost:8080/login | grep -q 'data-testid="username"'; then
-              echo "Login page is ready ✅"
+            echo "Checking /login inside app container... ($i)"
+
+            # Get headers + body (so we can see redirects/404/500/etc)
+            HTML="$(docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1' || true)"
+
+            # Accept both single and double quotes
+            echo "$HTML" | grep -Eq "data-testid=['\"]username['\"]" && {
+              echo "Login page contains username field ✅"
               exit 0
+            }
+
+            # Every 10 tries show a short preview
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "---- DEBUG preview (headers + first 120 lines) ----"
+              echo "$HTML" | head -n 120 || true
+              echo "-----------------------------------------------"
             fi
-            echo "Waiting for app/login... ($i)"
+
             sleep 2
           done
 
           echo "Login page did not become ready ❌"
-          docker exec "$APP_ID" wget -qO- http://localhost:8080/login || true
+
+          echo "---- FINAL /login output (headers + first 200 lines) ----"
+          docker exec "$APP_ID" sh -lc 'wget -S -O- http://localhost:8080/login 2>&1 | head -n 200' || true
+
+          echo "---- APP LOGS (last 200 lines) ----"
+          docker compose -f app/docker-compose.ci.yml logs app --tail=200 || true
+
           exit 1
 
       - name: Run UI tests
