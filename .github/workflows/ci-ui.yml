@@ -21,31 +21,42 @@ jobs:
           set -eux
           docker compose -f app/docker-compose.ci.yml up -d --build
 
-      - name: Wait for Selenium + App
+      - name: Wait for Selenium
         run: |
           set -eux
-          echo "Waiting for Selenium..."
           for i in {1..30}; do
             if curl -s http://localhost:4444/status | grep -q '"ready":true'; then
               echo "Selenium is ready"
+              exit 0
+            fi
+            echo "Waiting for Selenium... ($i)"
+            sleep 2
+          done
+          echo "Selenium not ready"
+          curl -s http://localhost:4444/status || true
+          exit 1
+
+      - name: Wait for App and verify /login has username field
+        run: |
+          set -eux
+          for i in {1..30}; do
+            if curl -sS http://localhost:8080/ >/dev/null 2>&1; then
+              echo "App is responding"
               break
             fi
+            echo "Waiting for app... ($i)"
             sleep 2
           done
 
-          echo "Checking app homepage..."
-          curl -sSf http://localhost:8080/ | head -c 200
-          echo
-
-      - name: Debug /login HTML
-        run: |
-          set -eux
-          echo "---- /login HTML (first 120 lines) ----"
-          curl -sS http://localhost:8080/login | sed -n '1,120p' || true
-          echo
+          echo "---- /login HTML (first 200 lines) ----"
+          curl -sS http://localhost:8080/login | sed -n '1,200p' || true
           echo "---- grep for data-testid=username ----"
           curl -sS http://localhost:8080/login | grep -n 'data-testid="username"' || true
-          echo
+
+          # FAIL FAST if the login page doesn't include the expected field
+          curl -sS http://localhost:8080/login | grep -q 'data-testid="username"' \
+            && echo "Login page contains username field ✅" \
+            || (echo "Login page missing username field ❌" && exit 1)
 
       - name: Run UI tests
         run: |
@@ -55,7 +66,7 @@ jobs:
       - name: Print logs on failure
         if: failure()
         run: |
-          docker compose -f app/docker-compose.ci.yml logs --no-color --tail=200 || true
+          docker compose -f app/docker-compose.ci.yml logs --no-color --tail=300 || true
 
       - name: Cleanup
         if: always()
