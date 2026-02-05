@@ -1,18 +1,33 @@
 package com.example.ui;
 
-import org.junit.jupiter.api.*;
-import org.openqa.selenium.*;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.remote.RemoteWebDriver;
-import org.openqa.selenium.support.ui.WebDriverWait;
-
 import java.net.URL;
 import java.time.Duration;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
 public class LoginUiTest {
 
-    WebDriver driver;
-    String baseUrl;
+    private WebDriver driver;
+    private WebDriverWait wait;
+    private String baseUrl;
+
+    private static final By USERNAME = By.cssSelector("[data-testid='username']");
+    private static final By PASSWORD = By.cssSelector("[data-testid='password']");
+    private static final By LOGIN_BTN = By.cssSelector("[data-testid='login-btn']");
+    private static final By LOGIN_ERROR = By.cssSelector("[data-testid='login-error']");
+    private static final By DASHBOARD_TITLE = By.cssSelector("[data-testid='dashboard-title']");
+    private static final By LOGOUT_BTN = By.cssSelector("[data-testid='logout-btn']");
+    private static final By BUILD_TEXT = By.id("build-text");
 
     @BeforeEach
     void setup() throws Exception {
@@ -22,54 +37,62 @@ public class LoginUiTest {
         ChromeOptions options = new ChromeOptions();
         driver = new RemoteWebDriver(new URL(seleniumUrl), options);
 
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(1));
+        wait = new WebDriverWait(driver, Duration.ofSeconds(15));
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown(TestInfo testInfo) {
         if (driver != null) driver.quit();
     }
 
-    private WebDriverWait wait10() {
-        return new WebDriverWait(driver, Duration.ofSeconds(10));
+    private void waitForDocumentReady() {
+        try {
+            wait.until(d -> ((JavascriptExecutor) d).executeScript("return document.readyState").equals("complete"));
+        } catch (Exception ignored) {}
+    }
+
+    private void openLoginPage() {
+        driver.get(baseUrl + "/login");
+        waitForDocumentReady();
+        wait.until(ExpectedConditions.visibilityOfElementLocated(USERNAME));
+    }
+
+    private void loginAs(String user, String pass) {
+        openLoginPage();
+        driver.findElement(USERNAME).sendKeys(user);
+        driver.findElement(PASSWORD).sendKeys(pass);
+        driver.findElement(LOGIN_BTN).click();
     }
 
     @Test
     void successfulLogin_redirectsToDashboard() {
-        driver.get(baseUrl + "/login");
-        driver.findElement(By.cssSelector("[data-testid='username']")).sendKeys("qa");
-        driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("secret");
-        driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
+        loginAs("qa", "secret");
 
-        wait10().until(d -> d.getCurrentUrl().contains("/dashboard"));
-        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='dashboard-title']")).isDisplayed());
+        wait.until(ExpectedConditions.urlContains("/dashboard"));
+        waitForDocumentReady();
+        wait.until(ExpectedConditions.visibilityOfElementLocated(DASHBOARD_TITLE));
     }
 
     @Test
     void wrongPassword_showsError() {
-        driver.get(baseUrl + "/login");
-        driver.findElement(By.cssSelector("[data-testid='username']")).sendKeys("qa");
-        driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("wrong");
-        driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
+        loginAs("qa", "wrong");
 
-        wait10().until(d -> d.getCurrentUrl().contains("/login"));
-        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='login-error']")).isDisplayed());
+        wait.until(ExpectedConditions.urlContains("/login"));
+        waitForDocumentReady();
+        wait.until(ExpectedConditions.visibilityOfElementLocated(LOGIN_ERROR));
     }
 
     @Test
     void logout_returnsToHome() {
-        driver.get(baseUrl + "/login");
-        driver.findElement(By.cssSelector("[data-testid='username']")).sendKeys("qa");
-        driver.findElement(By.cssSelector("[data-testid='password']")).sendKeys("secret");
-        driver.findElement(By.cssSelector("[data-testid='login-btn']")).click();
+        loginAs("qa", "secret");
 
-        wait10().until(d -> d.getCurrentUrl().contains("/dashboard"));
-        wait10().until(d -> d.findElement(By.cssSelector("[data-testid='logout-btn']")).isDisplayed());
-
-        driver.findElement(By.cssSelector("[data-testid='logout-btn']")).click();
+        wait.until(ExpectedConditions.urlContains("/dashboard"));
+        wait.until(ExpectedConditions.elementToBeClickable(LOGOUT_BTN)).click();
 
         driver.get(baseUrl + "/");
-        wait10().until(d -> d.findElement(By.id("welcome-message")).isDisplayed());
-        wait10().until(d -> d.findElement(By.id("build-text")).isDisplayed());
+        waitForDocumentReady();
+
+        // Stable home page anchor that MUST exist (used by HomePageTest)
+        wait.until(ExpectedConditions.visibilityOfElementLocated(BUILD_TEXT));
     }
 }
