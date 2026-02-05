@@ -21,42 +21,46 @@ jobs:
           set -eux
           docker compose -f app/docker-compose.ci.yml up -d --build
 
-      - name: Wait for Selenium
+      # ✅ RELIABLE Selenium wait (Docker health, not localhost)
+      - name: Wait for Selenium (health)
         run: |
           set -eux
-          for i in {1..30}; do
-            if curl -s http://localhost:4444/status | grep -q '"ready":true'; then
-              echo "Selenium is ready"
+          SEL_ID="$(docker compose -f app/docker-compose.ci.yml ps -q selenium)"
+          echo "Selenium container id: $SEL_ID"
+
+          for i in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' "$SEL_ID" 2>/dev/null || true)"
+            echo "Selenium health: $status"
+            if [ "$status" = "healthy" ]; then
+              echo "Selenium is healthy ✅"
               exit 0
             fi
-            echo "Waiting for Selenium... ($i)"
             sleep 2
           done
-          echo "Selenium not ready"
-          curl -s http://localhost:4444/status || true
+
+          echo "Selenium did not become healthy ❌"
+          docker compose -f app/docker-compose.ci.yml logs selenium --tail=200 || true
           exit 1
 
+      # ✅ App check INSIDE container (not localhost)
       - name: Wait for App and verify /login has username field
         run: |
           set -eux
-          for i in {1..30}; do
-            if curl -sS http://localhost:8080/ >/dev/null 2>&1; then
-              echo "App is responding"
-              break
+          APP_ID="$(docker compose -f app/docker-compose.ci.yml ps -q app)"
+          echo "App container id: $APP_ID"
+
+          for i in $(seq 1 60); do
+            if docker exec "$APP_ID" wget -qO- http://localhost:8080/login | grep -q 'data-testid="username"'; then
+              echo "Login page is ready ✅"
+              exit 0
             fi
-            echo "Waiting for app... ($i)"
+            echo "Waiting for app/login... ($i)"
             sleep 2
           done
 
-          echo "---- /login HTML (first 200 lines) ----"
-          curl -sS http://localhost:8080/login | sed -n '1,200p' || true
-          echo "---- grep for data-testid=username ----"
-          curl -sS http://localhost:8080/login | grep -n 'data-testid="username"' || true
-
-          # FAIL FAST if the login page doesn't include the expected field
-          curl -sS http://localhost:8080/login | grep -q 'data-testid="username"' \
-            && echo "Login page contains username field ✅" \
-            || (echo "Login page missing username field ❌" && exit 1)
+          echo "Login page did not become ready ❌"
+          docker exec "$APP_ID" wget -qO- http://localhost:8080/login || true
+          exit 1
 
       - name: Run UI tests
         run: |
